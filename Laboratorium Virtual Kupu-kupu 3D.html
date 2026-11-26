@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Laboratorium Virtual Kupu-kupu 3D</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#060d17;color:#e2e8f0;font-family:Inter,sans-serif;user-select:none}
+.glass{background:rgba(10,22,40,.74);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(34,211,238,.28);box-shadow:0 8px 32px rgba(0,0,0,.55),inset 0 0 20px rgba(14,165,233,.06);border-radius:16px}
+#bg{position:fixed;inset:0;background:radial-gradient(circle at 50% 55%,rgba(14,165,233,.14),#060d17 70%)}
+#cv{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.abs{position:fixed}
+.mono{font-family:'JetBrains Mono',monospace}
+.card{background:rgba(15,31,56,.55);border:1px solid rgba(34,211,238,.16);border-radius:12px;padding:8px 10px;cursor:pointer;transition:.2s;display:flex;gap:10px;align-items:center}
+.card:hover{background:rgba(14,165,233,.16);border-color:rgba(34,211,238,.55)}
+.card.on{background:linear-gradient(135deg,rgba(14,165,233,.28),rgba(34,211,238,.12));border-color:#22d3ee;box-shadow:0 0 18px rgba(34,211,238,.22)}
+.chip{font-size:11px;padding:5px 10px;border-radius:99px;border:1px solid rgba(34,211,238,.3);cursor:pointer;white-space:nowrap}
+.chip.on{background:#0ea5e9;color:#fff;border-color:#22d3ee}
+.tab{flex:1;padding:9px 4px;font-size:12px;font-weight:600;text-align:center;cursor:pointer;border-bottom:2px solid transparent;color:#94a3b8}
+.tab.on{color:#22d3ee;border-color:#22d3ee}
+.btn{padding:8px 12px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid rgba(34,211,238,.3);background:rgba(15,31,56,.7);color:#cbd5e1;white-space:nowrap;transition:.2s}
+.btn.on{background:#0ea5e9;color:#fff;box-shadow:0 0 14px rgba(34,211,238,.5)}
+.metric{background:rgba(14,165,233,.08);border:1px solid rgba(34,211,238,.18);border-radius:10px;padding:8px}
+.pin{position:fixed;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;background:#0ea5e9;border:2px solid #fff;color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 14px #22d3ee;z-index:5;touch-action:none}
+.pin.sel{background:#f59e0b;box-shadow:0 0 18px #f59e0b;transform:scale(1.2)}
+.pin.ok{background:#22c55e;box-shadow:0 0 18px #22c55e}.pin.bad{background:#ef4444;box-shadow:0 0 18px #ef4444}
+.pin .tip{position:absolute;left:34px;top:-4px;background:rgba(6,13,23,.92);border:1px solid #22d3ee;border-radius:8px;padding:4px 8px;font-size:11px;font-weight:600;white-space:nowrap;pointer-events:none}
+.pin .tip i{display:block;font-style:normal;font-size:10px;color:#22d3ee;font-weight:400}
+.scroll{overflow-y:auto;scrollbar-width:thin;scrollbar-color:#0ea5e9 transparent}
+input[type=range]{accent-color:#22d3ee;width:110px}
+select{background:#0f1f38;color:#e2e8f0;border:1px solid rgba(34,211,238,.3);border-radius:8px;padding:6px;font-size:12px}
+@media(max-width:1000px){#left{width:210px!important}#right{width:260px!important}}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<canvas id="cv"></canvas>
+<div id="pins"></div>
+
+<!-- Header kiri -->
+<div class="abs" style="top:calc(12px + env(safe-area-inset-top,0px));left:16px;z-index:10">
+  <div class="flex gap-2 mb-1"><span class="chip on mono" style="cursor:default">MUSEUM BIOLOGI 3D</span><span class="chip mono" style="cursor:default">3D Interaktif</span></div>
+  <h1 style="font-size:17px;font-weight:800;letter-spacing:.04em;margin:0;color:#e0f7ff">LABORATORIUM VIRTUAL KUPU-KUPU 3D</h1>
+</div>
+<!-- Header kanan -->
+<div class="abs glass flex gap-5" style="top:calc(12px + env(safe-area-inset-top,0px));right:16px;z-index:10;padding:8px 14px">
+  <div><div class="mono" style="font-size:9px;color:#22d3ee">SPESIMEN AKTIF</div><div id="hName" style="font-weight:700;font-size:13px"></div><div id="hTerm" class="mono" style="font-size:10px;color:#94a3b8"></div></div>
+  <div><div class="mono" style="font-size:9px;color:#22d3ee">KATEGORI</div><div id="hCat" style="font-weight:700;font-size:13px"></div></div>
+</div>
+
+<!-- Sidebar kiri -->
+<div id="left" class="abs glass flex flex-col" style="top:calc(78px + env(safe-area-inset-top,0px));left:16px;bottom:96px;width:264px;padding:12px;z-index:10">
+  <div style="font-weight:700;font-size:13px;margin-bottom:8px">📚 Katalog Spesimen 3D</div>
+  <input id="q" placeholder="Cari nama atau istilah Latin…" style="width:100%;padding:8px 10px;border-radius:10px;background:#0f1f38;border:1px solid rgba(34,211,238,.3);color:#e2e8f0;font-size:12px;outline:none;margin-bottom:8px">
+  <div id="cats" class="flex gap-1 mb-2 scroll" style="overflow-x:auto;padding-bottom:4px"></div>
+  <div id="list" class="scroll flex flex-col gap-2" style="flex:1"></div>
+</div>
+
+<!-- Sidebar kanan -->
+<div id="right" class="abs glass flex flex-col" style="top:calc(78px + env(safe-area-inset-top,0px));right:16px;bottom:96px;width:330px;z-index:10">
+  <div style="padding:12px 14px 6px"><div id="rName" style="font-weight:800;font-size:17px;color:#22d3ee"></div><div id="rTerm" class="mono" style="font-size:10px;color:#94a3b8">Terminologi Biologi</div></div>
+  <div class="flex" style="border-bottom:1px solid rgba(34,211,238,.2)"><div class="tab on" data-t="0">Struktur</div><div class="tab" data-t="1">Ancaman &amp; Fakta</div><div class="tab" data-t="2">Kuis 3D</div></div>
+  <div id="tabBody" class="scroll" style="flex:1;padding:12px 14px"></div>
+</div>
+
+<!-- Dock -->
+<div class="abs glass flex items-center gap-2 flex-wrap justify-center" style="bottom:calc(14px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);padding:8px 12px;z-index:10;max-width:96vw">
+  <span style="font-size:12px">✂️ Irisan</span>
+  <select id="axis"><option value="">Nonaktif</option><option value="y">Axial (Y)</option><option value="x">Sagittal (X)</option><option value="z">Coronal (Z)</option></select>
+  <input id="cut" type="range" min="-2" max="2" step="0.02" value="2">
+  <button class="btn" id="bX">🩻 X-Ray</button><button class="btn" id="bW">🕸️ Wireframe</button>
+  <button class="btn on" id="bP">📍 Pin</button><button class="btn" id="bR">🔄 Putar Otomatis</button>
+  <button class="btn on" id="bL">⚡ Simulasi Hidup</button><button class="btn" id="bC">🎯 Reset Kamera</button>
+</div>
+
+<script>
+/* ===================== DATA SPESIMEN ===================== */
+const COMP=[
+{id:'telur',icon:'🥚',cat:'Siklus Hidup',name:'Telur',term:'Ovum (Telur)',
+ desc:'Tahap pertama metamorfosis. Induk betina menempelkan telur pada daun tumbuhan inang agar ulat yang menetas langsung punya makanan. Di dalam cangkang, embrio berkembang selama beberapa hari.',
+ m:[['Ukuran','1–2 mm'],['Waktu Menetas','3–7 hari'],['Letak','Daun tumbuhan inang'],['Jumlah','1 hingga ratusan']],
+ pins:[['Korion (Cangkang)','Chorion','Lapisan luar keras dan beralur yang melindungi embrio dari kekeringan dan benturan.'],['Mikropil','Micropyle','Lubang mikroskopis tempat sperma masuk saat pembuahan.'],['Embrio','Embryo','Calon ulat yang tumbuh dengan memakan kuning telur di dalam cangkang.'],['Daun Inang','Host Plant Leaf','Daun tumbuhan khusus yang akan dimakan ulat setelah menetas.'],['Telur Tetangga','Egg Cluster','Beberapa spesies meletakkan telur berkelompok untuk saling menghangatkan.']],
+ bad:[['Parasitoid','Tawon kecil bertelur di dalam telur','Telur tidak menetas, tawon dewasa keluar.'],['Pestisida','Semprotan pada tanaman','Embrio mati atau ulat lemah setelah menetas.'],['Hilangnya tanaman inang','Pembukaan lahan','Induk tidak menemukan tempat bertelur.']]},
+{id:'ulat',icon:'🐛',cat:'Siklus Hidup',name:'Ulat (Larva)',term:'Larva / Caterpillar',
+ desc:'Tahap makan dan tumbuh. Ulat terus melahap daun dan berganti kulit beberapa kali (instar) karena kerangka luarnya tidak ikut membesar. Tubuh beruas dengan kaki sejati dan kaki semu.',
+ m:[['Jumlah Instar','4–5 kali ganti kulit'],['Lama Fase','2–4 minggu'],['Pertambahan Massa','Hingga ±1.000×'],['Makanan','Daun inang']],
+ pins:[['Kepala','Head Capsule','Keras, membawa rahang pengunyah kuat dan mata sederhana (stemmata).'],['Kaki Sejati','Thoracic Legs','Tiga pasang kaki beruas di dekat kepala yang akan menjadi kaki dewasa.'],['Kaki Semu','Prolegs','Tonjolan gemuk berkait kecil untuk mencengkeram ranting, hilang saat dewasa.'],['Spirakel','Spiracle','Lubang napas di sisi tubuh yang menyalurkan udara ke sistem trakea.'],['Ruas Abdomen','Abdominal Segment','Ruas berpola belang sebagai peringatan bagi pemangsa bahwa ulat beracun.']],
+ bad:[['Burung & tawon','Pemangsa alami','Populasi ulat menyusut, pola belang membantu menakuti.'],['Penyakit virus','Infeksi NPV','Ulat lemas dan tubuh mencair.'],['Racun pestisida','Residu pada daun','Gagal berganti kulit dan mati.']]},
+{id:'pupa',icon:'🟢',cat:'Siklus Hidup',name:'Kepompong (Pupa)',term:'Pupa / Chrysalis',
+ desc:'Tahap perombakan total. Tampak diam, tetapi di dalam kulitnya jaringan ulat terurai dan disusun ulang menjadi tubuh kupu-kupu: sayap, antena, dan mata majemuk terbentuk.',
+ m:[['Lama Fase','1–3 minggu'],['Jenis','Krisalis (tanpa kokon)'],['Gerak','Minimal'],['Proses','Histolisis & histogenesis']],
+ pins:[['Benang Sutra','Silk Pad','Bantalan sutra yang melekat kuat pada ranting.'],['Kremaster','Cremaster','Tangkai berkait kecil yang menggantungkan kepompong pada bantalan sutra.'],['Kulit Pupa','Chrysalis Cuticle','Kulit keras hijau yang menyamarkan pupa sebagai daun.'],['Bintik Emas','Golden Spots','Bintik berkilau khas beberapa spesies, fungsinya masih diteliti.'],['Calon Sayap','Wing Case','Tonjolan di sisi pupa tempat sayap berkembang.']],
+ bad:[['Parasitoid','Lalat atau tawon penyerang pupa','Kupu-kupu tidak muncul.'],['Jamur','Kelembapan berlebih','Pupa membusuk.'],['Gangguan fisik','Tersentuh atau terjatuh','Sayap cacat saat keluar.']]},
+{id:'imago',icon:'🦋',cat:'Siklus Hidup',name:'Kupu-kupu Dewasa',term:'Imago',
+ desc:'Tahap dewasa yang bereproduksi dan menyebarkan diri. Memakai probosis untuk menghisap nektar, sayap bersisik untuk terbang dan menyamar, serta berperan sebagai penyerbuk bunga.',
+ m:[['Rentang Sayap','3–30 cm'],['Jumlah Sayap','2 pasang'],['Umur Dewasa','Minggu–bulan'],['Tubuh','Kepala, toraks, abdomen']],
+ pins:[['Antena','Antenna','Alat pembau dan keseimbangan, ujungnya membesar seperti gada.'],['Sayap Depan','Forewing','Sayap besar penghasil daya dorong utama saat mengepak.'],['Sayap Belakang','Hindwing','Sayap lebih kecil yang membantu manuver dan kestabilan.'],['Toraks','Thorax','Pusat otot terbang; tempat sayap dan tiga pasang kaki menempel.'],['Abdomen','Abdomen','Berisi sistem pencernaan dan organ reproduksi.']],
+ bad:[['Hilang habitat','Alih fungsi lahan','Populasi menurun karena tak ada bunga dan tanaman inang.'],['Perubahan iklim','Suhu dan musim bergeser','Migrasi dan waktu muncul terganggu.'],['Pemangsa','Burung, laba-laba, capung','Ancaman alami bagi kupu-kupu dewasa.']]},
+{id:'sayap',icon:'🪶',cat:'Anatomi Dewasa',name:'Sayap',term:'Ala (Sayap) & Squama',
+ desc:'Membran tipis ditopang vena dan ditutupi ribuan sisik bertumpuk seperti genteng. Warna berasal dari pigmen dan struktur nano sisik yang membiaskan cahaya.',
+ m:[['Penutup','Ribuan sisik'],['Rangka','Vena sayap'],['Warna','Pigmen + struktural'],['Fungsi','Terbang, kamuflase, termoregulasi']],
+ pins:[['Vena Sayap','Wing Veins','Rangka berongga penopang membran dan penyalur hemolimfa.'],['Sisik Sayap','Wing Scales','Pelat mikroskopis bertumpuk; pembentuk warna dan pola.'],['Tepi Sayap','Wing Margin','Pinggiran sayap, sering berwarna gelap sebagai pola peringatan.'],['Bintik & Pola','Eyespot / Pattern','Pola menarik atau menakuti pemangsa.'],['Pangkal Sayap','Wing Base','Titik sendi tempat sayap menempel pada toraks.']],
+ bad:[['Sayap robek','Gesekan dan serangan pemangsa','Terbang tidak stabil.'],['Sisik rontok','Sentuhan jari manusia','Warna pudar dan kemampuan terbang berkurang.'],['Suhu rendah','Hawa dingin','Otot terbang kaku, kupu-kupu tak bisa terbang.']]},
+{id:'kepala',icon:'👁️',cat:'Anatomi Dewasa',name:'Kepala',term:'Caput',
+ desc:'Pusat indra. Dua mata majemuk melihat gerak dan warna (termasuk ultraviolet), antena membaui, dan probosis yang menggulung dipakai menyedot nektar.',
+ m:[['Mata Majemuk','Ribuan faset'],['Antena','Pembau & keseimbangan'],['Probosis','Menggulung spiral'],['Makanan','Nektar bunga']],
+ pins:[['Mata Majemuk','Compound Eye','Tersusun atas ribuan lensa kecil (ommatidia) penghasil gambar mozaik.'],['Antena','Antenna','Mendeteksi bau bunga dan feromon pasangan.'],['Probosis','Proboscis','Tabung seperti sedotan yang menggulung saat tidak dipakai.'],['Palpus Labial','Labial Palp','Sensor rasa dan pelindung probosis.'],['Kapsul Kepala','Head Capsule','Kerangka luar kepala berlapis rambut halus.']],
+ bad:[['Probosis tersumbat','Nektar mengering','Kupu-kupu sulit makan.'],['Pestisida pada bunga','Residu kimia','Keracunan saat menyesap nektar.'],['Mata rusak','Cedera','Gagal menemukan bunga dan pasangan.']]},
+{id:'toraks',icon:'🦵',cat:'Anatomi Dewasa',name:'Toraks',term:'Thorax',
+ desc:'Bagian tengah tubuh dengan tiga ruas (protoraks, mesotoraks, metatoraks). Dipenuhi otot terbang dan menjadi tempat melekatnya empat sayap serta tiga pasang kaki.',
+ m:[['Ruas','3'],['Kaki','3 pasang (6)'],['Sayap','2 pasang'],['Rangka','Eksoskeleton kitin']],
+ pins:[['Pangkal Sayap Depan','Forewing Base','Pada mesotoraks, digerakkan otot terbang besar.'],['Pangkal Sayap Belakang','Hindwing Base','Pada metatoraks, bekerja berpasangan dengan sayap depan.'],['Femur','Femur','Ruas paha kaki yang kokoh sebagai penopang tubuh.'],['Tarsus','Tarsus','Ujung kaki dengan sensor rasa agar kupu-kupu tahu mana daun inang.'],['Spirakel Toraks','Thoracic Spiracle','Lubang napas pada sisi toraks.']],
+ bad:[['Otot terbang lelah','Migrasi jauh','Kupu-kupu butuh istirahat dan nektar.'],['Kaki patah','Pemangsaan atau cedera','Sulit hinggap dan makan.'],['Suhu terlalu rendah','Toraks perlu hangat ±30°C','Kupu-kupu berjemur dulu sebelum terbang.']]}
+];
+const CATS=['Semua','Siklus Hidup','Anatomi Dewasa'];
+
+/* ===================== STATE ===================== */
+const S={id:'telur',cat:'Semua',q:'',tab:0,pin:-1,xray:false,wire:false,pins:true,live:true,quiz:null};
+const $=id=>document.getElementById(id);
+
+/* ===================== THREE SETUP ===================== */
+const cv=$('cv');
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.localClippingEnabled=true;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45,1,.1,100);
+const HOME=new THREE.Vector3(4.6,3.2,5.6);
+camera.position.copy(HOME);
+const controls=new THREE.OrbitControls(camera,cv);
+controls.enableDamping=true;controls.dampingFactor=.08;controls.minDistance=3;controls.maxDistance=14;controls.autoRotateSpeed=2;
+controls.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN};
+controls.target.set(0,.1,0);
+scene.add(new THREE.AmbientLight(0x88aacc,.7));
+const dl=new THREE.DirectionalLight(0xffffff,1.1);dl.position.set(4,7,5);scene.add(dl);
+const pl=new THREE.PointLight(0x22d3ee,1.2,20);pl.position.set(-4,2,-3);scene.add(pl);
+
+// Pedestal holografik
+const ped=new THREE.Group();
+ped.add(new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.7,.12,64),new THREE.MeshStandardMaterial({color:0x0b2236,metalness:.8,roughness:.3,emissive:0x0a4d6e,emissiveIntensity:.5})));
+const ring=new THREE.Mesh(new THREE.TorusGeometry(2.45,.03,12,96),new THREE.MeshBasicMaterial({color:0x22d3ee}));ring.rotation.x=Math.PI/2;ring.position.y=.07;ped.add(ring);
+const ring2=ring.clone();ring2.material=new THREE.MeshBasicMaterial({color:0x0ea5e9,transparent:true,opacity:.5});ring2.scale.set(.7,.7,.7);ped.add(ring2);
+ped.position.y=-1.3;scene.add(ped);
+
+const plane=new THREE.Plane(new THREE.Vector3(0,-1,0),2);
+let holder=new THREE.Group();scene.add(holder);
+let current=null,anchors=[],liveFn=null;
+
+/* ===================== PEMBANGUN MODEL PROSEDURAL ===================== */
+function pcbTex(base){
+  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+  x.fillStyle=base;x.fillRect(0,0,256,256);x.strokeStyle='rgba(255,215,120,.32)';x.lineWidth=1.4;
+  for(let i=0;i<46;i++){let px=Math.random()*256,py=Math.random()*256;x.beginPath();x.moveTo(px,py);
+    for(let k=0;k<4;k++){if(k%2)px+=Math.random()*70-35;else py+=Math.random()*70-35;x.lineTo(px,py);}x.stroke();
+    x.fillStyle='rgba(255,215,120,.5)';x.fillRect(px-2,py-2,4,4);}
+  return new THREE.CanvasTexture(c);
+}
+const B=(w,h,d)=>new THREE.BoxGeometry(w,h,d), C=(a,b,h,s=32)=>new THREE.CylinderGeometry(a,b,h,s);
+function mk(parent,geo,col,pos=[0,0,0],o={}){
+  const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial(Object.assign({color:col,roughness:.45,metalness:.35,side:THREE.DoubleSide},o)));
+  m.position.set(...pos);parent.add(m);return m;
+}
+function anc(parent,x,y,z){const a=new THREE.Object3D();a.position.set(x,y,z);parent.add(a);return a;}
+const GOLD=0xd4a93c,GREEN=0x0f6b3a;
+
+const SP=(r,sx=1,sy=1,sz=1)=>{const gm=new THREE.SphereGeometry(r,24,18);gm.scale(sx,sy,sz);return gm;};
+function rod(p,a,b,r,col,o){const A=new THREE.Vector3(...a),Bv=new THREE.Vector3(...b),len=A.distanceTo(Bv);
+  const m=mk(p,C(r,r,len,8),col,[0,0,0],o);m.position.copy(A).add(Bv).multiplyScalar(.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),Bv.clone().sub(A).normalize());return m;}
+function wingTex(){
+  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+  const gr=x.createLinearGradient(0,0,256,0);gr.addColorStop(0,'#7c2d12');gr.addColorStop(.25,'#ea580c');gr.addColorStop(1,'#fb923c');
+  x.fillStyle=gr;x.fillRect(0,0,256,256);
+  x.strokeStyle='#111';x.lineWidth=5;
+  for(let i=0;i<9;i++){x.beginPath();x.moveTo(0,128);x.lineTo(240,i*30);x.stroke();}
+  x.fillStyle='#111';x.fillRect(0,0,256,16);x.fillRect(0,240,256,16);x.fillRect(222,0,34,256);
+  x.fillStyle='#fff';for(let i=0;i<12;i++){x.beginPath();x.arc(14+i*20,8,3.5,0,7);x.fill();x.beginPath();x.arc(14+i*20,248,3.5,0,7);x.fill();x.beginPath();x.arc(239,14+i*20,3.5,0,7);x.fill();}
+  return new THREE.CanvasTexture(c);
+}
+function wingGeo(kind){
+  const s=new THREE.Shape();
+  if(kind==='f'){s.moveTo(0,.1);s.quadraticCurveTo(.7,.95,1.55,.85);s.quadraticCurveTo(1.8,.4,1.45,.05);s.quadraticCurveTo(1,-.3,0,-.12);}
+  else{s.moveTo(0,-.02);s.quadraticCurveTo(.9,.05,1.15,-.45);s.quadraticCurveTo(1.0,-1.0,.45,-1.05);s.quadraticCurveTo(.1,-.9,0,-.7);}
+  const g=new THREE.ShapeGeometry(s,16);g.computeBoundingBox();const b=g.boundingBox,uv=g.attributes.uv,p=g.attributes.position;
+  for(let i=0;i<uv.count;i++)uv.setXY(i,(p.getX(i)-b.min.x)/(b.max.x-b.min.x),(p.getY(i)-b.min.y)/(b.max.y-b.min.y));
+  g.rotateX(Math.PI/2);return g;
+}
+const BUILD={
+telur(g){
+  mk(g,SP(1.9,1,.04,.9),0x3fae5f,[0,-.3,0],{roughness:.7,metalness:0});
+  rod(g,[-1.8,-.27,0],[1.8,-.27,0],.03,0x2f8a49);
+  mk(g,SP(.55,1,1.25,1),0xfff3c4,[0,.45,0],{roughness:.35,metalness:0});
+  const em=mk(g,SP(.3,1,1.2,1),0xf59e0b,[0,.4,0],{emissive:0xf59e0b,emissiveIntensity:.5});
+  mk(g,SP(.06),0x3b2a1e,[0,1.14,0]);
+  const small=[[1,0,-.5],[1.3,.5,-.3],[-1,.4,-.5],[-1.2,-.5,-.45],[.5,.9,-.4],[-.4,-.8,-.4],[.7,-.75,-.4],[-.6,.8,-.4]];
+  small.forEach(p=>mk(g,SP(.2,1,1.2,1),0xfff3c4,[p[0],-.05,p[1]],{roughness:.4,metalness:0}));
+  g.userData.live=t=>{em.scale.setScalar(1+.07*Math.sin(t*4));em.material.emissiveIntensity=.45+.3*Math.sin(t*4);};
+  return [anc(g,.55,.5,0),anc(g,0,1.18,0),anc(g,0,.4,0),anc(g,1.5,-.28,.6),anc(g,1,.1,-.5)];
+},
+ulat(g){
+  const cols=[0xf8fafc,0xfacc15,0x1a1a1a],segs=[];
+  rod(g,[-3,-.45,0],[3,-.45,0],.12,0x5b3a24);
+  mk(g,SP(.9,1,.04,.6),0x3fae5f,[-1.6,-.2,.5]).rotation.z=.1;
+  for(let i=0;i<9;i++){const r=.3-Math.abs(i-4)*.01-(i===0?.05:0);
+    const s=mk(g,SP(r,1,1,1),cols[i%3],[-1.7+i*.42,0,0],{roughness:.6,metalness:0});s.userData.b=s.position.y;segs.push(s);}
+  const head=mk(segs[8],SP(.3),0x1f1f1f,[.42,.04,0]);
+  for(const z of[-.14,.14])mk(head,SP(.06),0xffffff,[.2,.06,z]);
+  for(const z of[-.1,.1])mk(head,new THREE.ConeGeometry(.05,.15,6),0x6b4a38,[.3,-.1,z]);
+  for(const i of[6,7,8])for(const z of[-.13,.13])mk(segs[i],C(.04,.02,.32,6),0x222222,[0,-.3,z]);
+  for(const i of[2,3,4,5])for(const z of[-.13,.13])mk(segs[i],C(.07,.11,.22,8),0xcfd5c0,[0,-.3,z]);
+  mk(segs[0],C(.06,.1,.2,8),0xcfd5c0,[-.1,-.3,0]);
+  mk(segs[4],SP(.04,1,1,1.6),0x000000,[0,.05,.3]);
+  g.userData.live=t=>segs.forEach((s,i)=>{s.position.y=s.userData.b+.12*Math.sin(t*3-i*.6);});
+  return [anc(head,.25,.2,0),anc(segs[7],0,-.5,.13),anc(segs[3],0,-.45,.13),anc(segs[4],0,.05,.34),anc(segs[1],0,.32,0)];
+},
+pupa(g){
+  rod(g,[-1.8,2.35,0],[1.8,2.35,0],.1,0x5b3a24);
+  mk(g,SP(.18,1.4,.5,1.4),0xf5f5f5,[0,2.22,0]);
+  const ch=new THREE.Group();ch.position.set(0,1.9,0);g.add(ch);
+  mk(ch,C(.04,.06,.45,8),0x3b2a1e,[0,.22,0]);
+  const pr=[[0,0],[.12,-.05],[.3,-.25],[.5,-.7],[.58,-1.15],[.5,-1.6],[.3,-2.0],[.12,-2.35],[0,-2.45]].map(p=>new THREE.Vector2(p[0],p[1]));
+  mk(ch,new THREE.LatheGeometry(pr,32),0x8ee08a,[0,0,0],{roughness:.3,metalness:.1});
+  const ring=mk(ch,new THREE.TorusGeometry(.33,.025,8,32),0x111111,[0,-.28,0]);ring.rotation.x=Math.PI/2;
+  let gold;for(let i=0;i<8;i++){const a=i/8*Math.PI*2;gold=mk(ch,SP(.045),GOLD,[Math.cos(a)*.56,-.6,Math.sin(a)*.56],{metalness:.95,roughness:.2});}
+  mk(ch,SP(.25,1,2.2,.35),0x5fb85c,[0,-1.2,.47]);
+  const inner=mk(ch,SP(.35,1,3,1),0xfb923c,[0,-1.2,0],{emissive:0xfb923c,emissiveIntensity:.4});
+  g.userData.live=t=>{ch.rotation.z=Math.sin(t*.9)*.05;inner.scale.setScalar(1+.05*Math.sin(t*4));};
+  return [anc(g,0,2.32,.12),anc(ch,0,.05,0),anc(ch,.48,-1.5,.2),anc(gold,.05,0,0),anc(ch,0,-1.2,.62)];
+},
+imago(g){
+  const tex=wingTex();
+  mk(g,SP(.28,1,.9,1.3),0x2b1a10,[0,0,0],{roughness:.9,metalness:0});
+  mk(g,SP(.2),0x1a1a1a,[0,.02,.5]);
+  mk(g,SP(.16,1,1,3.2),0x2b1a10,[0,0,-.85],{roughness:.8,metalness:0});
+  for(const s of[-1,1])mk(g,SP(.09),0x050505,[s*.14,.08,.62]);
+  const ants=[];
+  for(const s of[-1,1]){const a=new THREE.Group();a.position.set(s*.07,.12,.62);g.add(a);
+    rod(a,[0,0,0],[s*.4,.55,.75],.012,0x111111);mk(a,SP(.045,1,1,1.6),0x111111,[s*.4,.55,.75]);ants.push(a);}
+  const mkW=(kind,s,pos)=>{const p=new THREE.Group();p.position.set(...pos);g.add(p);
+    const w=mk(p,wingGeo(kind),0xffffff,[0,0,0],{map:tex,roughness:.6,metalness:0});w.scale.x=s;p.userData.s=s;return p;};
+  const fR=mkW('f',1,[.1,.12,.15]),fL=mkW('f',-1,[-.1,.12,.15]),hR=mkW('h',1,[.1,.1,-.05]),hL=mkW('h',-1,[-.1,.1,-.05]);
+  [fR,fL,hR,hL].forEach(p=>p.rotation.z=p.userData.s*.35);
+  g.userData.live=t=>{const a=.15+.6*Math.sin(t*3.5),b=.15+.6*Math.sin(t*3.5-.5);
+    fR.rotation.z=a;fL.rotation.z=-a;hR.rotation.z=b;hL.rotation.z=-b;
+    ants.forEach((q,i)=>q.rotation.z=Math.sin(t*2+i)*.06);};
+  return [anc(ants[1],.4,.55,.75),anc(fR,1.0,.03,.45),anc(hR,.7,.03,-.5),anc(g,0,.26,.05),anc(g,0,.15,-.9)];
+},
+sayap(g){
+  const tex=wingTex(),wg=wingGeo('f');wg.scale(1.6,1.6,1.6);
+  mk(g,wg,0xffffff,[-.9,0,0],{map:tex,roughness:.6,metalness:0});
+  const base=[-.9,.03,.16];
+  [[1.8,1.36],[1.9,.5],[1.5,-.15],[.6,-.1],[.9,.9]].forEach(e=>rod(g,base,[e[0]-.0,.03,e[1]],.018,0x111111));
+  const pt=new THREE.Group();pt.position.set(-1.1,1.0,-1.1);pt.rotation.x=-.5;g.add(pt);
+  mk(pt,B(1.9,.03,2.4),0x14161c,[0,-.03,0]);
+  const im=new THREE.InstancedMesh(SP(.1,1,.2,1.6),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.35,metalness:.4,side:THREE.DoubleSide}),120),mt=new THREE.Matrix4(),pal=[0xea580c,0xfb923c,0x111111,0xf8fafc,0xc2410c],cl=new THREE.Color();let n=0;
+  for(let j=0;j<12;j++)for(let i=0;i<10;i++){mt.makeRotationY((Math.random()-.5)*.25);mt.setPosition(-.8+i*.17+(j%2)*.085,.0,-1.0+j*.18);im.setMatrixAt(n,mt);im.setColorAt(n++,cl.setHex(pal[(i*3+j*5)%pal.length]));}
+  pt.add(im);
+  g.userData.live=t=>{pt.rotation.y=Math.sin(t*.8)*.25;};
+  return [anc(g,.45,.04,.76),anc(pt,0,.1,0),anc(g,1.7,.04,.8),anc(g,1.3,.04,.3),anc(g,-.8,.04,.16)];
+},
+kepala(g){
+  mk(g,SP(.55),0x3a2a22,[0,0,0],{roughness:.95,metalness:0});
+  for(const s of[-1,1])mk(g,new THREE.IcosahedronGeometry(.34,2),0x0b0d12,[s*.36,.1,.2],{flatShading:true,roughness:.2,metalness:.6});
+  const pal=[];for(const s of[-1,1])pal.push(mk(g,SP(.1,1,1,2.2),0x6b4a38,[s*.14,-.28,.55],{roughness:.95,metalness:0}));
+  const ants=[];
+  for(const s of[-1,1]){const a=new THREE.Group();a.position.set(s*.2,.45,.2);g.add(a);
+    rod(a,[0,0,0],[s*.6,1.05,.3],.02,0x111111);mk(a,SP(.07,1,1,1.8),0x111111,[s*.6,1.05,.3]);ants.push(a);}
+  const pg=new THREE.Group();pg.position.set(0,-.35,.55);g.add(pg);
+  const pts=[];for(let i=0;i<=80;i++){const a=i/80*Math.PI*6,r=.28*(1-i/90);pts.push(new THREE.Vector3(Math.cos(a)*r,Math.sin(a)*r,0));}
+  mk(pg,new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),200,.025,6),0x5c3d2e);
+  g.userData.live=t=>{ants.forEach((q,i)=>q.rotation.z=Math.sin(t*2+i)*.08);pg.rotation.x=Math.sin(t*1.5)*.2;};
+  return [anc(g,.4,.3,.38),anc(ants[1],.6,1.05,.3),anc(pg,.28,0,0),anc(g,.14,-.28,.78),anc(g,0,.5,.15)];
+},
+toraks(g){
+  mk(g,SP(.8,1,.85,1.4),0x3b2a1e,[0,0,0],{roughness:.95,metalness:0});
+  mk(g,SP(.4,1,1,1.6),0x2b1a10,[0,0,-1.5],{roughness:.9,metalness:0});
+  mk(g,SP(.35),0x1a1a1a,[0,.05,1.35]);
+  for(const s of[-1,1]){mk(g,B(.35,.12,.5),0xcaa46a,[s*.8,.55,.45]);mk(g,B(.35,.12,.5),0xcaa46a,[s*.8,.5,-.4]);}
+  const legs=[];
+  [[.7,.2],[0,.0],[-.6,-.2]].forEach((zz,k)=>{for(const s of[-1,1]){
+    const p=new THREE.Group();p.position.set(s*.55,-.45,zz[0]);g.add(p);
+    rod(p,[0,0,0],[s*.75,-.5,.1],.09,0x2b1a10);rod(p,[s*.75,-.5,.1],[s*1.05,-1.35,.25],.07,0x4b3322);rod(p,[s*1.05,-1.35,.25],[s*1.15,-1.55,.4],.045,0x6b4a38);
+    legs.push(p);}});
+  mk(g,SP(.04,1,1,1.8),0x000000,[.8,.1,-.1]);
+  g.userData.live=t=>legs.forEach((l,i)=>l.rotation.x=Math.sin(t*3+i*1.2)*.15);
+  return [anc(g,.8,.62,.45),anc(g,.8,.57,-.4),anc(legs[1],-.37,-.25,.05),anc(legs[1],-1.15,-1.55,.4),anc(g,-.8,.1,-.1)];
+}};
+
+/* ===================== LOAD MODEL ===================== */
+function loadCustomGLB(url,onFail){ // Ganti model prosedural dengan file .glb / .gltf medis atau teknis
+  new THREE.GLTFLoader().load(url,gltf=>{
+    clearHolder();const m=gltf.scene;fitModel(m);holder.add(m);current=m;applyModes();
+  },undefined,err=>{console.warn('GLB gagal dimuat, memakai model prosedural.',err);onFail&&onFail();});
+}
+function fitModel(obj){
+  const b=new THREE.Box3().setFromObject(obj),sz=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
+  const s=3.3/Math.max(sz.x,sz.y,sz.z);obj.scale.multiplyScalar(s);obj.position.sub(c.multiplyScalar(s));
+}
+function clearHolder(){scene.remove(holder);holder=new THREE.Group();scene.add(holder);}
+function loadSpecimen(id){
+  S.id=id;S.pin=-1;S.quiz=null;
+  const o=COMP.find(c=>c.id===id);clearHolder();
+  const g=new THREE.Group();anchorsRaw=BUILD[id](g);
+  const inner=new THREE.Group();inner.add(g);holder.add(inner);
+  // normalisasi ukuran & posisi
+  const b=new THREE.Box3().setFromObject(g),sz=b.getSize(new THREE.Vector3()),c=b.getCenter(new THREE.Vector3());
+  const s=3.4/Math.max(sz.x,sz.y,sz.z);g.scale.setScalar(s);g.position.sub(c.multiplyScalar(s));
+  // model tampil agak miring agar detail terlihat
+  g.rotation.x=(id==='router'||id==='ram')?0:0;
+  current=g;anchors=anchorsRaw;liveFn=g.userData.live||null;
+  g.traverse(m=>{if(m.isMesh&&m.material){m.material.clippingPlanes=[plane];m.material.userData.t0=m.material.transparent;m.material.userData.o0=m.material.opacity;m.material.userData.b0=m.material.blending;}});
+  applyModes();updateCut();buildPins();renderAll();
+}
+let anchorsRaw=[];
+
+function applyModes(){
+  if(!current)return;
+  current.traverse(m=>{if(!m.isMesh)return;const mt=m.material,u=mt.userData;mt.wireframe=S.wire;if(u.skip||m.userData.skip)return;
+    if(S.xray){mt.transparent=true;mt.opacity=.32;mt.depthWrite=false;mt.blending=THREE.AdditiveBlending;}
+    else{mt.transparent=!!u.t0;mt.opacity=u.o0===undefined?1:u.o0;mt.depthWrite=true;mt.blending=u.b0===undefined?THREE.NormalBlending:u.b0;}
+    mt.needsUpdate=true;});
+}
+function updateCut(){
+  const a=$('axis').value,v=+$('cut').value;
+  if(!a){plane.normal.set(0,-1,0);plane.constant=99;return;}
+  plane.normal.set(a==='x'?-1:0,a==='y'?-1:0,a==='z'?-1:0);plane.constant=v;
+}
+
+/* ===================== PIN ===================== */
+function buildPins(){
+  const box=$('pins');box.innerHTML='';
+  anchors.forEach((a,i)=>{const d=document.createElement('div');d.className='pin';d.id='pin'+i;d.textContent=i+1;
+    d.style.display=S.pins?'flex':'none';
+    d.addEventListener('pointerdown',e=>{e.stopPropagation();pinClick(i);});box.appendChild(d);});
+}
+const _v=new THREE.Vector3();
+function updatePins(){
+  const o=COMP.find(c=>c.id===S.id);
+  anchors.forEach((a,i)=>{const d=$('pin'+i);if(!d)return;a.getWorldPosition(_v);_v.project(camera);
+    const vis=_v.z<1&&S.pins;d.style.display=vis?'flex':'none';
+    d.style.left=((_v.x+1)/2*innerWidth)+'px';d.style.top=((1-_v.y)/2*innerHeight)+'px';
+    d.classList.toggle('sel',S.pin===i&&!S.quiz);
+    const showTip=S.pin===i&&!S.quiz;const t=d.querySelector('.tip');
+    if(showTip&&!t){d.insertAdjacentHTML('beforeend','<span class="tip">'+o.pins[i][0]+'<i>'+o.pins[i][1]+'</i></span>');}
+    if(!showTip&&t)t.remove();});
+}
+function pinClick(i){
+  const o=COMP.find(c=>c.id===S.id);
+  if(S.quiz&&S.tab===2){answer(i);return;}
+  S.pin=i;if(S.tab!==0){S.tab=0;renderTabs();}renderBody();
+}
+
+/* ===================== KUIS ===================== */
+function startQuiz(){
+  const idx=[0,1,2,3,4].sort(()=>Math.random()-.5);
+  S.quiz={order:idx,i:0,score:0,fb:'',done:false};S.pin=-1;
+  anchors.forEach((_,i)=>$('pin'+i).classList.remove('ok','bad'));renderBody();
+}
+function answer(i){
+  const q=S.quiz;if(q.done)return;const o=COMP.find(c=>c.id===S.id),right=q.order[q.i];
+  anchors.forEach((_,k)=>$('pin'+k).classList.remove('ok','bad'));
+  if(i===right){q.score+=10;q.fb='✅ Benar! '+o.pins[right][2];$('pin'+i).classList.add('ok');
+    q.i++;if(q.i>=5)q.done=true;}
+  else{q.score=Math.max(0,q.score-2);q.fb='❌ Belum tepat. Pin '+(i+1)+' adalah "'+o.pins[i][0]+'". Coba lagi.';$('pin'+i).classList.add('bad');}
+  renderBody();
+}
+
+/* ===================== UI RENDER ===================== */
+function renderCats(){
+  $('cats').innerHTML=CATS.map(c=>'<span class="chip '+(S.cat===c?'on':'')+'" data-c="'+c+'">'+c+'</span>').join('');
+  $('cats').querySelectorAll('.chip').forEach(e=>e.onclick=()=>{S.cat=e.dataset.c;renderCats();renderList();});
+}
+function renderList(){
+  const q=S.q.toLowerCase();
+  const items=COMP.filter(c=>(S.cat==='Semua'||c.cat===S.cat)&&(c.name+' '+c.term).toLowerCase().includes(q));
+  $('list').innerHTML=items.map(c=>'<div class="card '+(c.id===S.id?'on':'')+'" data-id="'+c.id+'"><div style="font-size:24px">'+c.icon+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+c.name+'</div><div class="mono" style="font-size:10px;color:#94a3b8">'+c.term+'</div></div><span class="chip mono" style="cursor:default;padding:2px 7px">📍'+c.pins.length+'</span></div>').join('')||'<div style="font-size:12px;color:#94a3b8">Tidak ditemukan.</div>';
+  $('list').querySelectorAll('.card').forEach(e=>e.onclick=()=>loadSpecimen(e.dataset.id));
+}
+function renderTabs(){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',+t.dataset.t===S.tab));}
+function renderBody(){
+  const o=COMP.find(c=>c.id===S.id),b=$('tabBody');
+  if(S.tab===0){
+    const p=S.pin>=0?o.pins[S.pin]:null;
+    b.innerHTML='<div class="mono" style="font-size:10px;color:#22d3ee;margin-bottom:4px">DESKRIPSI &amp; FUNGSI UTAMA</div><p style="font-size:13px;line-height:1.6;margin:0 0 12px;color:#cbd5e1">'+o.desc+'</p>'
+    +'<div class="grid grid-cols-2 gap-2 mb-3">'+o.m.map(m=>'<div class="metric"><div style="font-size:10px;color:#94a3b8">'+m[0]+'</div><div style="font-weight:700;font-size:13px;color:#e0f7ff">'+m[1]+'</div></div>').join('')+'</div>'
+    +'<div class="mono" style="font-size:10px;color:#22d3ee;margin-bottom:4px">TITIK PIN ANATOMI AKTIF</div><div class="metric" style="min-height:84px">'
+    +(p?'<div style="font-weight:700;color:#f59e0b">'+(S.pin+1)+'. '+p[0]+'</div><div class="mono" style="font-size:10px;color:#94a3b8;margin-bottom:4px">'+p[1]+'</div><div style="font-size:12px;line-height:1.5">'+p[2]+'</div>':'<div style="font-size:12px;color:#94a3b8">Klik pin bernomor pada model 3D untuk melihat penjelasan bagian tersebut.</div>')+'</div>';
+  }else if(S.tab===1){
+    b.innerHTML='<div class="mono" style="font-size:10px;color:#22d3ee;margin-bottom:8px">ANCAMAN &amp; FAKTA PENTING</div>'+o.bad.map((x,i)=>'<div class="metric" style="margin-bottom:8px"><div style="font-weight:700;font-size:13px">⚠️ '+x[0]+'</div><div style="font-size:11px;color:#fbbf24;margin:3px 0">Penyebab: '+x[1]+'</div><div style="font-size:12px;color:#cbd5e1">Dampak: '+x[2]+'</div></div>').join('');
+  }else{
+    const q=S.quiz;
+    if(!q){b.innerHTML='<p style="font-size:13px;line-height:1.6;color:#cbd5e1">Uji pemahamanmu! Sistem memberi instruksi, lalu kamu mengklik pin yang benar pada model 3D.</p><button class="btn on" id="sq" style="width:100%;padding:12px">▶ Mulai Kuis '+o.name+'</button>';$('sq').onclick=startQuiz;}
+    else if(q.done){b.innerHTML='<div style="text-align:center;padding:16px"><div style="font-size:44px">🏆</div><div style="font-weight:800;font-size:20px">Skor: '+q.score+'/50</div><p style="font-size:12px;color:#94a3b8">'+q.fb+'</p><button class="btn on" id="sq">🔁 Ulangi</button></div>';$('sq').onclick=startQuiz;}
+    else{b.innerHTML='<div class="flex justify-between mono" style="font-size:11px;color:#22d3ee"><span>Soal '+(q.i+1)+'/5</span><span>Skor: '+q.score+'</span></div><div class="metric" style="margin:10px 0;font-size:14px;font-weight:700">Klik pin yang menunjukkan <span style="color:#f59e0b">'+o.pins[q.order[q.i]][0]+'</span></div><div style="font-size:12px;line-height:1.5;color:#cbd5e1">'+q.fb+'</div>';}
+  }
+}
+function renderAll(){
+  const o=COMP.find(c=>c.id===S.id);
+  $('hName').textContent=o.name;$('hTerm').textContent=o.term;$('hCat').textContent=o.cat;
+  $('rName').textContent=o.name;$('rTerm').textContent=o.term;
+  renderList();renderTabs();renderBody();
+}
+
+/* ===================== EVENT ===================== */
+$('q').oninput=e=>{S.q=e.target.value;renderList();};
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{S.tab=+t.dataset.t;renderTabs();renderBody();});
+function tog(id,k,fn){$(id).onclick=()=>{S[k]=!S[k];$(id).classList.toggle('on',S[k]);fn&&fn();};}
+tog('bX','xray',applyModes);tog('bW','wire',applyModes);
+tog('bP','pins',()=>{});tog('bL','live');
+$('bR').onclick=()=>{controls.autoRotate=!controls.autoRotate;$('bR').classList.toggle('on',controls.autoRotate);};
+$('bC').onclick=()=>{camera.position.copy(HOME);controls.target.set(0,.1,0);controls.update();};
+$('axis').onchange=()=>{updateCut();if(!$('axis').value)$('cut').value=2;else if(+$('cut').value>=2)$('cut').value=0;updateCut();};
+$('cut').oninput=()=>{if(!$('axis').value){$('axis').value='y';}updateCut();};
+function resize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();}
+addEventListener('resize',resize);
+
+/* ===================== LOOP ===================== */
+const clock=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);const t=clock.getElapsedTime();
+  if(S.live){holder.position.y=Math.sin(t*1.2)*.06;if(liveFn)liveFn(t);}else holder.position.y=0;
+  ring2.scale.setScalar(.7+.05*Math.sin(t*2));
+  controls.update();renderer.render(scene,camera);updatePins();
+}
+renderCats();resize();loadSpecimen('telur');loop();
+</script>
+</body>
+</html>
